@@ -151,19 +151,21 @@ Once connected, you'll see the TickTick MCP server tools available in Claude, in
 
 ## Available MCP Tools
 
-| Tool             | Description                                                                | Parameters                                                                                                                               |
-| ---------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_projects`   | List all your TickTick projects                                            | None                                                                                                                                     |
-| `get_project`    | Get details about a specific project                                       | `project_id`                                                                                                                             |
-| `get_tasks`      | Get tasks, optionally filtered by project and relative overdue/next-7-days | `project_id` (optional), `overdue_only` (optional), `due_in_next_7_days` (optional)                                                      |
-| `get_task`       | Get details about a specific task                                          | `project_id`, `task_id`                                                                                                                  |
-| `create_task`    | Create a new task                                                          | `title`, `project_id`, `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional)                       |
-| `update_task`    | Update an existing task                                                    | `task_id`, `project_id`, `title` (optional), `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional) |
-| `complete_task`  | Mark a task as complete                                                    | `project_id`, `task_id`                                                                                                                  |
-| `delete_task`    | Delete a task                                                              | `project_id`, `task_id`                                                                                                                  |
-| `create_project` | Create a new project                                                       | `name`, `color` (optional), `view_mode` (optional)                                                                                       |
-| `delete_project` | Delete a project                                                           | `project_id`                                                                                                                             |
-| `search_tasks`   | Search for tasks across all projects by keyword                            | `keywords`                                                                                                                               |
+| Tool             | Description                                                                               | Parameters                                                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_projects`   | List all your TickTick projects                                                           | None                                                                                                                                                     |
+| `get_project`    | Get details about a specific project                                                      | `project_id`                                                                                                                                             |
+| `get_tasks`      | Get tasks, optionally filtered by project, status, tags, and relative overdue/next-7-days | `project_id` (optional), `overdue_only` (optional), `due_in_next_7_days` (optional), `status` (optional, `"active"` or `"completed"`), `tags` (optional) |
+| `get_task`       | Get details about a specific task                                                         | `project_id`, `task_id`                                                                                                                                  |
+| `create_task`    | Create a new task                                                                         | `title`, `project_id`, `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional)                                       |
+| `update_task`    | Update an existing task                                                                   | `task_id`, `project_id`, `title` (optional), `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional)                 |
+| `complete_task`  | Mark a task as complete                                                                   | `project_id`, `task_id`                                                                                                                                  |
+| `delete_task`    | Delete a task                                                                             | `project_id`, `task_id`                                                                                                                                  |
+| `create_project` | Create a new project                                                                      | `name`, `color` (optional), `view_mode` (optional)                                                                                                       |
+| `delete_project` | Delete a project                                                                          | `project_id`                                                                                                                                             |
+| `search_tasks`   | Search for tasks across all projects by keyword                                           | `keywords`, `project_id` (optional), `tags` (optional)                                                                                                   |
+
+Dates passed to `start_date` and `due_date` should be ISO 8601 strings (for example `2025-10-15T04:00:00Z`). Plain dates (`YYYY-MM-DD`) are also accepted and are normalized to midnight UTC.
 
 ## Example Prompts for Claude
 

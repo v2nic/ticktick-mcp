@@ -44,6 +44,15 @@ class TaskStatus(IntEnum):
     ACTIVE = 0
     COMPLETED = 2
 
+
+def _normalize_date_input(date_str: str) -> str:
+    if "T" not in date_str:
+        return f"{date_str}T00:00:00+0000"
+    return date_str
+
+def task_url(project_id: str, task_id: str) -> str:
+    return f"https://ticktick.com/webapp/#p/{project_id}/tasks/{task_id}"
+
 def initialize_client():
     global ticktick
     try:
@@ -80,6 +89,9 @@ def format_task(task: Dict) -> str:
     
     # Add project ID
     formatted += f"Project ID: {task.get('projectId', 'None')}\n"
+    url = task.get("url")
+    if url:
+        formatted += f"URL: {url}\n"
     
     # Add dates if available
     if task.get('startDate'):
@@ -95,6 +107,9 @@ def format_task(task: Dict) -> str:
     status_value = task.get('status')
     status = "Completed" if status_value == TaskStatus.COMPLETED else "Active"
     formatted += f"Status: {status}\n"
+    tags = task.get('tags') or []
+    if tags:
+        formatted += f"Tags: {', '.join(tags)}\n"
     
     # Add content if available
     if task.get('content'):
@@ -187,6 +202,8 @@ async def get_tasks(
     project_id: Optional[str] = None,
     overdue_only: bool = False,
     due_in_next_7_days: bool = False,
+    status: Optional[str] = None,
+    tags: Optional[List[str]] = None,
 ) -> str:
     """Get tasks with optional project and relative date-based filters.
 
@@ -196,6 +213,10 @@ async def get_tasks(
         overdue_only: When True, include only active tasks whose due date is before now.
         due_in_next_7_days: When True, include only active tasks whose due date is
             within the next 7 days.
+        status: Optional status filter ("active" or "completed"). When omitted,
+            both active and completed tasks are included.
+        tags: Optional list of tag names; when provided, only tasks that contain at
+            least one of these tags are included.
         Task links can be constructed like: https://ticktick.com/webapp/#p/{project_id}/tasks/{task_id}
         Inbox tasks are in the project with ID "inbox".
     """
@@ -215,10 +236,11 @@ async def get_tasks(
                 continue
             try:
                 project_data = ticktick.get_project_with_data_model(pid)
-                tasks = [
-                    t.model_dump(by_alias=True, mode="json")
-                    for t in project_data.tasks
-                ]
+                tasks = []
+                for t in project_data.tasks:
+                    task_dict = t.model_dump(by_alias=True, mode="json")
+                    task_dict["url"] = task_url(pid, task_dict.get("id"))
+                    tasks.append(task_dict)
             except ValueError as e:
                 logger.warning(f"Error getting tasks for project {pid}: {e}")
                 continue
@@ -235,9 +257,18 @@ async def get_tasks(
 
         filtered_tasks = []
         for task in all_tasks:
+            status_value = task.get("status")
+
+            if status is not None:
+                normalized_status = status.lower()
+                if normalized_status == "active" and status_value == TaskStatus.COMPLETED:
+                    continue
+                if normalized_status == "completed" and status_value != TaskStatus.COMPLETED:
+                    continue
+
             # Relative overdue/next-7-days filters (active tasks only)
             if overdue_only or due_in_next_7_days:
-                if task.get("status") == TaskStatus.COMPLETED:
+                if status_value == TaskStatus.COMPLETED:
                     continue
                 due_date_str = task.get("dueDate")
                 if not due_date_str:
@@ -256,6 +287,11 @@ async def get_tasks(
                     due_in_next_7_days and is_next_7_days
                 )
                 if not include_rel:
+                    continue
+
+            if tags:
+                task_tags = [t.lower() for t in task.get("tags", [])]
+                if not any(tag.lower() in task_tags for tag in tags):
                     continue
 
             filtered_tasks.append(task)
@@ -289,7 +325,8 @@ async def get_task(project_id: str, task_id: str) -> str:
         task = ticktick.get_task(project_id, task_id)
         if 'error' in task:
             return f"Error fetching task: {task['error']}"
-        
+        task["url"] = task_url(project_id, task.get("id"))
+
         return format_task(task)
     except Exception as e:
         logger.error(f"Error in get_task: {e}")
@@ -311,8 +348,10 @@ async def create_task(
         title: Task title
         project_id: ID of the project to add the task to
         content: Task description/content (optional)
-        start_date: Start date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)
-        due_date: Due date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)
+        start_date: Start date in ISO 8601 format (for example 2025-10-15T04:00:00Z).
+            Plain dates (YYYY-MM-DD) are also accepted and normalized to midnight UTC.
+        due_date: Due date in ISO 8601 format (for example 2025-10-15T04:00:00Z).
+            Plain dates (YYYY-MM-DD) are also accepted and normalized to midnight UTC.
         priority: Priority level (0: None, 1: Low, 3: Medium, 5: High) (optional)
     """
     if not ticktick:
@@ -324,15 +363,19 @@ async def create_task(
         return "Invalid priority. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)."
     
     try:
+        if start_date:
+            start_date = _normalize_date_input(start_date)
+        if due_date:
+            due_date = _normalize_date_input(due_date)
+
         # Validate dates if provided
         for date_str, date_name in [(start_date, "start_date"), (due_date, "due_date")]:
             if date_str:
                 try:
-                    # Try to parse the date to validate it
                     datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 except ValueError:
                     return f"Invalid {date_name} format. Use ISO format: YYYY-MM-DDThh:mm:ss+0000"
-        
+
         task = ticktick.create_task(
             title=title,
             project_id=project_id,
@@ -344,7 +387,8 @@ async def create_task(
         
         if 'error' in task:
             return f"Error creating task: {task['error']}"
-        
+        task["url"] = task_url(project_id, task.get("id"))
+
         return f"Task created successfully:\n\n" + format_task(task)
     except Exception as e:
         logger.error(f"Error in create_task: {e}")
@@ -368,8 +412,10 @@ async def update_task(
         project_id: ID of the project the task belongs to
         title: New task title (optional)
         content: New task description/content (optional)
-        start_date: New start date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)
-        due_date: New due date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)
+        start_date: New start date in ISO 8601 format (for example 2025-10-15T04:00:00Z).
+            Plain dates (YYYY-MM-DD) are also accepted and normalized to midnight UTC.
+        due_date: New due date in ISO 8601 format (for example 2025-10-15T04:00:00Z).
+            Plain dates (YYYY-MM-DD) are also accepted and normalized to midnight UTC.
         priority: New priority level (0: None, 1: Low, 3: Medium, 5: High) (optional)
     """
     if not ticktick:
@@ -381,15 +427,19 @@ async def update_task(
         return "Invalid priority. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)."
     
     try:
+        if start_date:
+            start_date = _normalize_date_input(start_date)
+        if due_date:
+            due_date = _normalize_date_input(due_date)
+
         # Validate dates if provided
         for date_str, date_name in [(start_date, "start_date"), (due_date, "due_date")]:
             if date_str:
                 try:
-                    # Try to parse the date to validate it
                     datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 except ValueError:
                     return f"Invalid {date_name} format. Use ISO format: YYYY-MM-DDThh:mm:ss+0000"
-        
+
         task = ticktick.update_task(
             task_id=task_id,
             project_id=project_id,
@@ -402,7 +452,8 @@ async def update_task(
         
         if 'error' in task:
             return f"Error updating task: {task['error']}"
-        
+        task["url"] = task_url(project_id, task.get("id"))
+
         return f"Task updated successfully:\n\n" + format_task(task)
     except Exception as e:
         logger.error(f"Error in update_task: {e}")
@@ -517,11 +568,17 @@ async def delete_project(project_id: str) -> str:
 @mcp.tool()
 async def search_tasks(
     keywords: List[str],
+    project_id: Optional[str] = None,
+    tags: Optional[List[str]] = None,
 ) -> str:
     """Search for tasks across all projects based on provided keywords.
 
     Args:
         keywords: A list of keywords to search for in task titles or content.
+        project_id: Optional project ID. When provided, only tasks from this project
+            are considered.
+        tags: Optional list of tag names; when provided, only tasks that contain at
+            least one of these tags are included.
     """
     if not ticktick:
         if not initialize_client():
@@ -534,17 +591,20 @@ async def search_tasks(
             return f"Error getting projects for task search: {projects['error']}"
 
         for project in projects:
-            project_id = project.get('id')
-            try:
-                project_data = ticktick.get_project_with_data_model(project_id)
-                tasks = [
-                    t.model_dump(by_alias=True, mode="json")
-                    for t in project_data.tasks
-                ]
-            except ValueError as e:
-                logger.warning(f"Error getting tasks for project {project_id}: {e}")
+            pid = project.get('id')
+            if project_id and pid != project_id:
                 continue
-
+            try:
+                project_data = ticktick.get_project_with_data_model(pid)
+                tasks = []
+                for t in project_data.tasks:
+                    task_dict = t.model_dump(by_alias=True, mode="json")
+                    task_dict["url"] = f"https://ticktick.com/webapp/#p/{pid}/tasks/{task_dict.get('id')}"
+                    tasks.append(task_dict)
+            except ValueError as e:
+                logger.warning(f"Error getting tasks for project {pid}: {e}")
+                continue
+            
             all_tasks.extend(tasks)
 
         # Filter tasks based on keywords
@@ -552,9 +612,19 @@ async def search_tasks(
         for task in all_tasks:
             title = task.get('title', '').lower()
             content = task.get('content', '').lower()
+            matches_keywords = any(
+                keyword.lower() in title or keyword.lower() in content
+                for keyword in keywords
+            )
+            if not matches_keywords:
+                continue
 
-            if any(keyword.lower() in title or keyword.lower() in content for keyword in keywords):
-                filtered_tasks.append(task)
+            if tags:
+                task_tags = [t.lower() for t in task.get("tags", [])]
+                if not any(tag.lower() in task_tags for tag in tags):
+                    continue
+
+            filtered_tasks.append(task)
 
         if not filtered_tasks:
             return "No tasks found matching the provided keywords."

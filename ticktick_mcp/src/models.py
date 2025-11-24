@@ -37,6 +37,7 @@ class Task(BaseModel):
     start_date: Optional[datetime] = Field(default=None, alias="startDate")
     due_date: Optional[datetime] = Field(default=None, alias="dueDate")
     reminders: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     priority: Optional[int] = None
     status: Optional[int] = None
     completed_time: Optional[datetime] = Field(default=None, alias="completedTime")
