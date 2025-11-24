@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+from .models import ProjectData
 import requests
 import logging
 from pathlib import Path
@@ -192,6 +193,13 @@ class TickTickClient:
     def get_project_with_data(self, project_id: str) -> Dict:
         """Gets project with tasks and columns."""
         return self._make_request("GET", f"/project/{project_id}/data")
+    
+    def get_project_with_data_model(self, project_id: str) -> ProjectData:
+        """Gets project with tasks and columns as a ProjectData model."""
+        data = self.get_project_with_data(project_id)
+        if "error" in data:
+            raise ValueError(f"Error getting project data: {data['error']}")
+        return ProjectData.model_validate(data)
     
     def create_project(self, name: str, color: str = "#F18181", view_mode: str = "list", kind: str = "TASK") -> Dict:
         """Creates a new project."""

@@ -2,7 +2,8 @@ import asyncio
 import json
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from enum import IntEnum
 from typing import Dict, List, Any, Optional
 
 from mcp.server.fastmcp import FastMCP
@@ -19,6 +20,29 @@ mcp = FastMCP("ticktick")
 
 # Create TickTick client
 ticktick = None
+
+class TaskPriority(IntEnum):
+    NONE = 0
+    LOW = 1
+    MEDIUM = 3
+    HIGH = 5
+
+    @classmethod
+    def is_valid(cls, value: int) -> bool:
+        return value in cls._value2member_map_
+
+    @classmethod
+    def label(cls, value: int) -> str:
+        if value not in cls._value2member_map_:
+            return str(value)
+        member = cls(value)
+        if member is cls.NONE:
+            return "None"
+        return member.name.title()
+
+class TaskStatus(IntEnum):
+    ACTIVE = 0
+    COMPLETED = 2
 
 def initialize_client():
     global ticktick
@@ -64,12 +88,12 @@ def format_task(task: Dict) -> str:
         formatted += f"Due Date: {task.get('dueDate')}\n"
     
     # Add priority if available
-    priority_map = {0: "None", 1: "Low", 3: "Medium", 5: "High"}
     priority = task.get('priority', 0)
-    formatted += f"Priority: {priority_map.get(priority, str(priority))}\n"
+    formatted += f"Priority: {TaskPriority.label(priority)}\n"
     
     # Add status if available
-    status = "Completed" if task.get('status') == 2 else "Active"
+    status_value = task.get('status')
+    status = "Completed" if status_value == TaskStatus.COMPLETED else "Active"
     formatted += f"Status: {status}\n"
     
     # Add content if available
@@ -159,34 +183,94 @@ async def get_project(project_id: str) -> str:
         return f"Error retrieving project: {str(e)}"
 
 @mcp.tool()
-async def get_project_tasks(project_id: str) -> str:
-    """
-    Get all tasks in a specific project.
-    
+async def get_tasks(
+    project_id: Optional[str] = None,
+    overdue_only: bool = False,
+    due_in_next_7_days: bool = False,
+) -> str:
+    """Get tasks with optional project and relative date-based filters.
+
     Args:
-        project_id: ID of the project
+        project_id: Optional project ID. When provided, only tasks from this project
+            are considered. When omitted, tasks from all projects are included.
+        overdue_only: When True, include only active tasks whose due date is before now.
+        due_in_next_7_days: When True, include only active tasks whose due date is
+            within the next 7 days.
+        Task links can be constructed like: https://ticktick.com/webapp/#p/{project_id}/tasks/{task_id}
+        Inbox tasks are in the project with ID "inbox".
     """
     if not ticktick:
         if not initialize_client():
             return "Failed to initialize TickTick client. Please check your API credentials."
-    
+
     try:
-        project_data = ticktick.get_project_with_data(project_id)
-        if 'error' in project_data:
-            return f"Error fetching project data: {project_data['error']}"
-        
-        tasks = project_data.get('tasks', [])
-        if not tasks:
-            return f"No tasks found in project '{project_data.get('project', {}).get('name', project_id)}'."
-        
-        result = f"Found {len(tasks)} tasks in project '{project_data.get('project', {}).get('name', project_id)}':\n\n"
-        for i, task in enumerate(tasks, 1):
-            result += f"Task {i}:\n" + format_task(task) + "\n"
-        
-        return result
+        all_tasks = []
+        projects = ticktick.get_projects()
+        if 'error' in projects:
+            return f"Error getting projects for task retrieval: {projects['error']}"
+
+        for project in projects:
+            pid = project.get('id')
+            if project_id and pid != project_id:
+                continue
+            try:
+                project_data = ticktick.get_project_with_data_model(pid)
+                tasks = [
+                    t.model_dump(by_alias=True, mode="json")
+                    for t in project_data.tasks
+                ]
+            except ValueError as e:
+                logger.warning(f"Error getting tasks for project {pid}: {e}")
+                continue
+
+            all_tasks.extend(tasks)
+
+        if not all_tasks:
+            if project_id:
+                return f"No tasks found in project '{project_id}'."
+            return "No tasks found."
+
+        now = datetime.now(timezone.utc)
+        end = now + timedelta(days=7)
+
+        filtered_tasks = []
+        for task in all_tasks:
+            # Relative overdue/next-7-days filters (active tasks only)
+            if overdue_only or due_in_next_7_days:
+                if task.get("status") == TaskStatus.COMPLETED:
+                    continue
+                due_date_str = task.get("dueDate")
+                if not due_date_str:
+                    continue
+                try:
+                    due_dt = datetime.fromisoformat(
+                        due_date_str.replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    continue
+
+                is_overdue = due_dt < now
+                is_next_7_days = now <= due_dt <= end
+
+                include_rel = (overdue_only and is_overdue) or (
+                    due_in_next_7_days and is_next_7_days
+                )
+                if not include_rel:
+                    continue
+
+            filtered_tasks.append(task)
+
+        if not filtered_tasks:
+            if project_id:
+                return f"No tasks found in project '{project_id}'."
+            return "No tasks found."
+
+        formatted_tasks = [format_task(t) for t in filtered_tasks]
+        return "Found tasks:\n\n" + "\n---\n".join(formatted_tasks)
+
     except Exception as e:
-        logger.error(f"Error in get_project_tasks: {e}")
-        return f"Error retrieving project tasks: {str(e)}"
+        logger.error(f"Error in get_tasks: {e}")
+        return f"Error getting tasks: {str(e)}"
 
 @mcp.tool()
 async def get_task(project_id: str, task_id: str) -> str:
@@ -236,7 +320,7 @@ async def create_task(
             return "Failed to initialize TickTick client. Please check your API credentials."
     
     # Validate priority
-    if priority not in [0, 1, 3, 5]:
+    if not TaskPriority.is_valid(priority):
         return "Invalid priority. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)."
     
     try:
@@ -293,7 +377,7 @@ async def update_task(
             return "Failed to initialize TickTick client. Please check your API credentials."
     
     # Validate priority if provided
-    if priority is not None and priority not in [0, 1, 3, 5]:
+    if priority is not None and not TaskPriority.is_valid(priority):
         return "Invalid priority. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)."
     
     try:
@@ -429,10 +513,12 @@ async def delete_project(project_id: str) -> str:
         logger.error(f"Error in delete_project: {e}")
         return f"Error deleting project: {str(e)}"
 
+
 @mcp.tool()
-async def search_tasks(keywords: List[str]) -> str:
-    """
-    Searches for tasks across all projects based on provided keywords.
+async def search_tasks(
+    keywords: List[str],
+) -> str:
+    """Search for tasks across all projects based on provided keywords.
 
     Args:
         keywords: A list of keywords to search for in task titles or content.
@@ -449,19 +535,24 @@ async def search_tasks(keywords: List[str]) -> str:
 
         for project in projects:
             project_id = project.get('id')
-            project_data = ticktick.get_project_with_data(project_id)
-            if 'error' in project_data:
-                logger.warning(f"Error getting tasks for project {project_id}: {project_data['error']}")
+            try:
+                project_data = ticktick.get_project_with_data_model(project_id)
+                tasks = [
+                    t.model_dump(by_alias=True, mode="json")
+                    for t in project_data.tasks
+                ]
+            except ValueError as e:
+                logger.warning(f"Error getting tasks for project {project_id}: {e}")
                 continue
-            all_tasks.extend(project_data.get('tasks', []))
+
+            all_tasks.extend(tasks)
 
         # Filter tasks based on keywords
         filtered_tasks = []
         for task in all_tasks:
             title = task.get('title', '').lower()
             content = task.get('content', '').lower()
-            
-            # Check if any keyword is present in title or content
+
             if any(keyword.lower() in title or keyword.lower() in content for keyword in keywords):
                 filtered_tasks.append(task)
 

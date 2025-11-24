@@ -22,12 +22,14 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ti
 ## Installation
 
 1. **Clone this repository**:
+
    ```bash
    git clone https://github.com/jacepark12/ticktick-mcp.git
    cd ticktick-mcp
    ```
 
 2. **Install with uv**:
+
    ```bash
    # Install uv if you don't have it already
    curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -46,12 +48,14 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ti
    ```
 
 3. **Authenticate with TickTick**:
+
    ```bash
    # Run the authentication flow
    uv run -m ticktick_mcp.cli auth
    ```
 
    This will:
+
    - Ask for your TickTick Client ID and Client Secret
    - Open a browser window for you to log in to TickTick
    - Automatically save your access tokens to a `.env` file
@@ -67,10 +71,12 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ti
 This server uses OAuth2 to authenticate with TickTick. The setup process is straightforward:
 
 1. Register your application at the [TickTick Developer Center](https://developer.ticktick.com/manage)
+
    - Set the redirect URI to `http://localhost:8000/callback`
    - Note your Client ID and Client Secret
 
 2. Run the authentication command:
+
    ```bash
    uv run -m ticktick_mcp.cli auth
    ```
@@ -88,10 +94,12 @@ The server handles token refresh automatically, so you won't need to reauthentic
 [滴答清单 - Dida365](https://dida365.com/home) is China version of TickTick, and the authentication process is similar to TickTick. Follow these steps to set up Dida365 authentication:
 
 1. Register your application at the [Dida365 Developer Center](https://developer.dida365.com/manage)
+
    - Set the redirect URI to `http://localhost:8000/callback`
    - Note your Client ID and Client Secret
 
 2. Add environment variables to your `.env` file:
+
    ```env
    TICKTICK_BASE_URL='https://api.dida365.com/open/v1'
    TICKTICK_AUTH_URL='https://dida365.com/oauth/authorize'
@@ -106,24 +114,34 @@ The server handles token refresh automatically, so you won't need to reauthentic
 2. Edit your Claude for Desktop configuration file:
 
    **macOS**:
+
    ```bash
    nano ~/Library/Application\ Support/Claude/claude_desktop_config.json
    ```
 
    **Windows**:
+
    ```bash
    notepad %APPDATA%\Claude\claude_desktop_config.json
    ```
 
 3. Add the TickTick MCP server configuration, using absolute paths:
+
    ```json
    {
-      "mcpServers": {
-         "ticktick": {
-            "command": "<absolute path to uv>",
-            "args": ["run", "--directory", "<absolute path to ticktick-mcp directory>", "-m", "ticktick_mcp.cli", "run"]
-         }
-      }
+     "mcpServers": {
+       "ticktick": {
+         "command": "<absolute path to uv>",
+         "args": [
+           "run",
+           "--directory",
+           "<absolute path to ticktick-mcp directory>",
+           "-m",
+           "ticktick_mcp.cli",
+           "run"
+         ]
+       }
+     }
    }
    ```
 
@@ -133,18 +151,19 @@ Once connected, you'll see the TickTick MCP server tools available in Claude, in
 
 ## Available MCP Tools
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_projects` | List all your TickTick projects | None |
-| `get_project` | Get details about a specific project | `project_id` |
-| `get_project_tasks` | List all tasks in a project | `project_id` |
-| `get_task` | Get details about a specific task | `project_id`, `task_id` |
-| `create_task` | Create a new task | `title`, `project_id`, `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional) |
-| `update_task` | Update an existing task | `task_id`, `project_id`, `title` (optional), `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional) |
-| `complete_task` | Mark a task as complete | `project_id`, `task_id` |
-| `delete_task` | Delete a task | `project_id`, `task_id` |
-| `create_project` | Create a new project | `name`, `color` (optional), `view_mode` (optional) |
-| `delete_project` | Delete a project | `project_id` |
+| Tool             | Description                                                                | Parameters                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_projects`   | List all your TickTick projects                                            | None                                                                                                                                     |
+| `get_project`    | Get details about a specific project                                       | `project_id`                                                                                                                             |
+| `get_tasks`      | Get tasks, optionally filtered by project and relative overdue/next-7-days | `project_id` (optional), `overdue_only` (optional), `due_in_next_7_days` (optional)                                                      |
+| `get_task`       | Get details about a specific task                                          | `project_id`, `task_id`                                                                                                                  |
+| `create_task`    | Create a new task                                                          | `title`, `project_id`, `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional)                       |
+| `update_task`    | Update an existing task                                                    | `task_id`, `project_id`, `title` (optional), `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional) |
+| `complete_task`  | Mark a task as complete                                                    | `project_id`, `task_id`                                                                                                                  |
+| `delete_task`    | Delete a task                                                              | `project_id`, `task_id`                                                                                                                  |
+| `create_project` | Create a new project                                                       | `name`, `color` (optional), `view_mode` (optional)                                                                                       |
+| `delete_project` | Delete a project                                                           | `project_id`                                                                                                                             |
+| `search_tasks`   | Search for tasks across all projects by keyword                            | `keywords`                                                                                                                               |
 
 ## Example Prompts for Claude
 
