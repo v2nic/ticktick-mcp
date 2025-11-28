@@ -53,6 +53,18 @@ def _normalize_date_input(date_str: str) -> str:
 def task_url(project_id: str, task_id: str) -> str:
     return f"https://ticktick.com/webapp/#p/{project_id}/tasks/{task_id}"
 
+def ensure_inbox_project_included(projects: List[Dict]) -> None:
+    """
+    Ensures the inbox project is included in the projects list.
+    
+    The inbox project is a special built-in project that exists for all users
+    but isn't returned by the get_projects() API call. This function adds it
+    to the list if it's not already present.
+    """
+    inbox_project = {"id": "inbox", "name": "Inbox"}
+    if not any(p.get('id') == 'inbox' for p in projects):
+        projects.append(inbox_project)
+
 def initialize_client():
     global ticktick
     try:
@@ -163,6 +175,9 @@ async def get_projects() -> str:
         if 'error' in projects:
             return f"Error fetching projects: {projects['error']}"
         
+        # Include inbox project for complete project listing
+        ensure_inbox_project_included(projects)
+        
         if not projects:
             return "No projects found."
         
@@ -229,6 +244,8 @@ async def get_tasks(
         projects = ticktick.get_projects()
         if 'error' in projects:
             return f"Error getting projects for task retrieval: {projects['error']}"
+
+        ensure_inbox_project_included(projects)
 
         for project in projects:
             pid = project.get('id')
@@ -589,6 +606,8 @@ async def search_tasks(
         projects = ticktick.get_projects()
         if 'error' in projects:
             return f"Error getting projects for task search: {projects['error']}"
+
+        ensure_inbox_project_included(projects)
 
         for project in projects:
             pid = project.get('id')

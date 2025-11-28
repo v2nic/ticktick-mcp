@@ -53,6 +53,6 @@ class Column(BaseModel):
 
 
 class ProjectData(BaseModel):
-    project: Project
+    project: Optional[Project] = None
     tasks: List[Task] = Field(default_factory=list)
     columns: List[Column] = Field(default_factory=list)
