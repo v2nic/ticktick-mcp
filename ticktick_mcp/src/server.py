@@ -626,18 +626,21 @@ async def search_tasks(
             
             all_tasks.extend(tasks)
 
-        # Filter tasks based on keywords
+        # Filter tasks based on keywords and tags
         filtered_tasks = []
         for task in all_tasks:
             title = task.get('title', '').lower()
             content = task.get('content', '').lower()
-            matches_keywords = any(
+            
+            # Check if keywords match (or if no keywords provided)
+            matches_keywords = not keywords or any(
                 keyword.lower() in title or keyword.lower() in content
                 for keyword in keywords
             )
             if not matches_keywords:
                 continue
 
+            # Check if tags match (or if no tags provided)
             if tags:
                 task_tags = [t.lower() for t in task.get("tags", [])]
                 if not any(tag.lower() in task_tags for tag in tags):
