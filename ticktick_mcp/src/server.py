@@ -43,6 +43,15 @@ class TaskPriority(IntEnum):
 class TaskStatus(IntEnum):
     ACTIVE = 0
     COMPLETED = 2
+    
+    @classmethod
+    def label(cls, value: int) -> str:
+        if value == cls.ACTIVE:
+            return "Active"
+        elif value == cls.COMPLETED:
+            return "Completed"
+        else:
+            return f"Unknown ({value})"
 
 
 def _normalize_date_input(date_str: str) -> str:
@@ -117,7 +126,7 @@ def format_task(task: Dict) -> str:
     
     # Add status if available
     status_value = task.get('status')
-    status = "Completed" if status_value == TaskStatus.COMPLETED else "Active"
+    status = TaskStatus.label(status_value) if status_value is not None else "Unknown"
     formatted += f"Status: {status}\n"
     tags = task.get('tags') or []
     if tags:
@@ -587,6 +596,7 @@ async def search_tasks(
     keywords: List[str],
     project_id: Optional[str] = None,
     tags: Optional[List[str]] = None,
+    status: Optional[str] = None,
 ) -> str:
     """Search for tasks across all projects based on provided keywords.
 
@@ -596,6 +606,8 @@ async def search_tasks(
             are considered.
         tags: Optional list of tag names; when provided, only tasks that contain at
             least one of these tags are included.
+        status: Optional status filter ("active" or "completed"). When not specified,
+            only active tasks are returned.
     """
     if not ticktick:
         if not initialize_client():
@@ -644,6 +656,19 @@ async def search_tasks(
             if tags:
                 task_tags = [t.lower() for t in task.get("tags", [])]
                 if not any(tag.lower() in task_tags for tag in tags):
+                    continue
+
+            # Check if status matches (default to active if not specified)
+            if status:
+                task_status = task.get("status", 0)  # Default to 0 (active) if not specified
+                if status == "active" and task_status != 0:
+                    continue
+                elif status == "completed" and task_status != 2:
+                    continue
+            else:
+                # Default behavior: only return active tasks
+                task_status = task.get("status", 0)
+                if task_status != 0:
                     continue
 
             filtered_tasks.append(task)

@@ -22,6 +22,7 @@ class FakeTickTickClient:
                     "startDate": "2024-01-01T03:00:00+0000",
                     "dueDate": "2024-01-02T03:00:00+0000",
                     "tags": ["responsibility", "week1"],
+                    "status": 0,  # Active
                 },
                 {
                     "id": "task-2",
@@ -31,6 +32,7 @@ class FakeTickTickClient:
                     "startDate": "2024-01-03T03:00:00+0000",
                     "dueDate": "2024-01-04T03:00:00+0000",
                     "tags": ["30Day"],
+                    "status": 0,  # Active
                 },
                 {
                     "id": "task-3",
@@ -40,6 +42,27 @@ class FakeTickTickClient:
                     "startDate": "2024-01-05T03:00:00+0000",
                     "dueDate": "2024-01-06T03:00:00+0000",
                     "tags": [],
+                    "status": 0,  # Active
+                },
+                {
+                    "id": "task-4",
+                    "title": "Completed task",
+                    "projectId": "project-1",
+                    "content": "This task is done",
+                    "startDate": "2024-01-07T03:00:00+0000",
+                    "dueDate": "2024-01-08T03:00:00+0000",
+                    "tags": ["week1"],
+                    "status": 2,  # Completed
+                },
+                {
+                    "id": "task-5",
+                    "title": "Abandoned task",
+                    "projectId": "project-1",
+                    "content": "This task was abandoned",
+                    "startDate": "2024-01-09T03:00:00+0000",
+                    "dueDate": "2024-01-10T03:00:00+0000",
+                    "tags": ["week1"],
+                    "status": 5,  # Some other status (e.g., abandoned)
                 },
             ]
         }
@@ -60,6 +83,13 @@ class FakeTickTickClient:
             for task in self.tasks_by_project.get(project_id, [])
         ]
         return ProjectData(project=project, tasks=tasks, columns=[])
+
+    def get_task(self, project_id: str, task_id: str):
+        """Get a specific task by ID"""
+        for task in self.tasks_by_project.get(project_id, []):
+            if task.get('id') == task_id:
+                return task
+        return None
 
 
 class SearchTasksToolTest(unittest.TestCase):
@@ -212,6 +242,49 @@ class SearchTasksToolTest(unittest.TestCase):
         self.assertIn("Found tasks:", result)
         self.assertIn("Buy milk", result)  # has "week1" tag
         self.assertNotIn("Write report", result)
+
+    def test_search_tasks_status_filter_active(self) -> None:
+        """Test searching with status='active' filter"""
+        result = asyncio.run(server.search_tasks(keywords=[], status="active"))
+
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Buy milk", result)  # active task
+        self.assertIn("Write report", result)  # active task
+        self.assertIn("Meeting with team", result)  # active task
+
+    def test_search_tasks_status_filter_completed(self) -> None:
+        """Test searching with status='completed' filter"""
+        result = asyncio.run(server.search_tasks(keywords=[], status="completed"))
+
+        # Should return the completed task
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Completed task", result)  # completed task
+        self.assertNotIn("Buy milk", result)  # active task
+        self.assertNotIn("Write report", result)  # active task
+
+    def test_search_tasks_status_filter_with_tags(self) -> None:
+        """Test searching with both status and tags"""
+        result = asyncio.run(server.search_tasks(keywords=[], tags=["30Day"], status="active"))
+
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Write report", result)  # has "30Day" tag and is active
+        self.assertNotIn("Buy milk", result)  # doesn't have "30Day" tag
+
+    def test_search_tasks_default_status_active(self) -> None:
+        """Test that default behavior returns only active tasks"""
+        result = asyncio.run(server.search_tasks(keywords=[]))
+
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Buy milk", result)  # active task
+        self.assertIn("Write report", result)  # active task
+        self.assertIn("Meeting with team", result)  # active task
+
+    def test_task_status_display(self) -> None:
+        """Test that different task statuses are displayed correctly"""
+        result = asyncio.run(server.get_task(project_id="project-1", task_id="task-5"))
+
+        self.assertIn("Abandoned task", result)
+        self.assertIn("Status: Unknown (5)", result)  # Should show unknown status value
 
 
 if __name__ == "__main__":
