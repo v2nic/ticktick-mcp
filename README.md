@@ -55,23 +55,23 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ti
    ```
 
    This will:
-
    - Ask for your TickTick Client ID and Client Secret
    - Open a browser window for you to log in to TickTick
    - Automatically save your access tokens to a `.env` file
 
-4. **Test your configuration**:
+4. **Run all tests**:
+
    ```bash
-   uv run test_server.py
+   uv run test_all.py
    ```
-   This will verify that your TickTick credentials are working correctly.
+
+   This will verify your TickTick credentials and test the complete system functionality.
 
 ## Authentication with TickTick
 
 This server uses OAuth2 to authenticate with TickTick. The setup process is straightforward:
 
 1. Register your application at the [TickTick Developer Center](https://developer.ticktick.com/manage)
-
    - Set the redirect URI to `http://localhost:8000/callback`
    - Note your Client ID and Client Secret
 
@@ -94,7 +94,6 @@ The server handles token refresh automatically, so you won't need to reauthentic
 [滴答清单 - Dida365](https://dida365.com/home) is China version of TickTick, and the authentication process is similar to TickTick. Follow these steps to set up Dida365 authentication:
 
 1. Register your application at the [Dida365 Developer Center](https://developer.dida365.com/manage)
-
    - Set the redirect URI to `http://localhost:8000/callback`
    - Note your Client ID and Client Secret
 
@@ -182,13 +181,16 @@ Here are some example prompts to use with Claude after connecting the TickTick M
 
 ### Project Structure
 
-```
+```text
 ticktick-mcp/
 ├── .env.template          # Template for environment variables
 ├── README.md              # Project documentation
 ├── requirements.txt       # Project dependencies
 ├── setup.py               # Package setup file
+├── test_all.py            # Run all tests with single command
 ├── test_server.py         # Test script for server configuration
+├── test_integration.py    # Integration tests for CLI and server startup
+├── test_search_tasks.py   # Unit tests for search functionality
 └── ticktick_mcp/          # Main package
     ├── __init__.py        # Package initialization
     ├── authenticate.py    # OAuth authentication utility
@@ -212,6 +214,16 @@ The project implements a complete OAuth 2.0 flow for TickTick:
 6. **Token Refresh**: The client automatically refreshes the access token when it expires
 
 This simplifies the user experience by handling the entire OAuth flow programmatically.
+
+### Testing
+
+Run all tests to verify everything works:
+
+```bash
+uv run test_all.py
+```
+
+This runs the complete test suite including API connectivity, integration tests, and unit tests to ensure the system is working correctly.
 
 ### Contributing
 

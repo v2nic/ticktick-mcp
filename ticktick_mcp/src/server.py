@@ -4,7 +4,7 @@ import os
 import logging
 from datetime import datetime, timezone, timedelta
 from enum import IntEnum
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Dict
 
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
