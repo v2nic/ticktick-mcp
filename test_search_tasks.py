@@ -286,6 +286,17 @@ class SearchTasksToolTest(unittest.TestCase):
         self.assertIn("Abandoned task", result)
         self.assertIn("Status: Unknown (5)", result)  # Should show unknown status value
 
+    def test_search_tasks_status_filter_abandoned(self) -> None:
+        """Test searching with status='abandoned' filter"""
+        # Update test data to use proper abandoned status
+        server.ticktick.tasks_by_project["project-1"][4]["status"] = -1
+        result = asyncio.run(server.search_tasks(keywords=[], status="abandoned"))
+
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Abandoned task", result)  # abandoned task
+        self.assertNotIn("Buy milk", result)  # active task
+        self.assertNotIn("Write report", result)  # active task
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,7 @@ class TaskPriority(IntEnum):
 class TaskStatus(IntEnum):
     ACTIVE = 0
     COMPLETED = 2
+    ABANDONED = -1
     
     @classmethod
     def label(cls, value: int) -> str:
@@ -50,6 +51,8 @@ class TaskStatus(IntEnum):
             return "Active"
         elif value == cls.COMPLETED:
             return "Completed"
+        elif value == cls.ABANDONED:
+            return "Abandoned"
         else:
             return f"Unknown ({value})"
 
@@ -606,7 +609,7 @@ async def search_tasks(
             are considered.
         tags: Optional list of tag names; when provided, only tasks that contain at
             least one of these tags are included.
-        status: Optional status filter ("active" or "completed"). When not specified,
+        status: Optional status filter ("active", "completed", or "abandoned"). When not specified,
             only active tasks are returned.
     """
     if not ticktick:
@@ -661,14 +664,16 @@ async def search_tasks(
             # Check if status matches (default to active if not specified)
             if status:
                 task_status = task.get("status", 0)  # Default to 0 (active) if not specified
-                if status == "active" and task_status != 0:
+                if status == "active" and task_status != TaskStatus.ACTIVE:
                     continue
-                elif status == "completed" and task_status != 2:
+                elif status == "completed" and task_status != TaskStatus.COMPLETED:
+                    continue
+                elif status == "abandoned" and task_status != TaskStatus.ABANDONED:
                     continue
             else:
                 # Default behavior: only return active tasks
                 task_status = task.get("status", 0)
-                if task_status != 0:
+                if task_status != TaskStatus.ACTIVE:
                     continue
 
             filtered_tasks.append(task)
