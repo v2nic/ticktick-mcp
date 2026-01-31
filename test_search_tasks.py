@@ -123,16 +123,16 @@ class SearchTasksToolTest(unittest.TestCase):
 
     def test_search_tasks_by_tag_only(self) -> None:
         """Test that searching by tags without keywords works"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=["responsibility"]))
+        result = asyncio.run(server.search_tasks(tags=["responsibility"]))
 
         self.assertIn("Found tasks:", result)
-        self.assertIn("Buy milk", result)
-        self.assertNotIn("Write report", result)
-        self.assertNotIn("Meeting with team", result)
+        self.assertIn("Buy milk", result)  # has "responsibility" tag
+        self.assertNotIn("Write report", result)  # doesn't have "responsibility" tag
+        self.assertNotIn("Meeting with team", result)  # has no tags
 
     def test_search_tasks_by_multiple_tags(self) -> None:
         """Test searching by multiple tags"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=["week1", "30Day"]))
+        result = asyncio.run(server.search_tasks(tags=["week1", "30Day"]))
 
         self.assertIn("Found tasks:", result)
         self.assertIn("Buy milk", result)  # has week1 tag
@@ -140,8 +140,8 @@ class SearchTasksToolTest(unittest.TestCase):
         self.assertNotIn("Meeting with team", result)  # has no tags
 
     def test_search_tasks_by_nonexistent_tag(self) -> None:
-        """Test searching for a tag that doesn't exist"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=["nonexistent"]))
+        """Test searching by tag that doesn't exist"""
+        result = asyncio.run(server.search_tasks(tags=["nonexistent"]))
 
         self.assertEqual(
             "No tasks found matching the provided keywords.",
@@ -153,9 +153,9 @@ class SearchTasksToolTest(unittest.TestCase):
         result = asyncio.run(server.search_tasks(keywords=["milk"], tags=["responsibility"]))
 
         self.assertIn("Found tasks:", result)
-        self.assertIn("Buy milk", result)
-        self.assertNotIn("Write report", result)
-        self.assertNotIn("Meeting with team", result)
+        self.assertIn("Buy milk", result)  # matches both keyword and tag
+        self.assertNotIn("Write report", result)  # has tag but not keyword
+        self.assertNotIn("Meeting with team", result)  # has neither
 
     def test_get_tasks_overdue_only(self) -> None:
         fixed_now = datetime(2024, 1, 3, tzinfo=timezone.utc)
@@ -210,34 +210,33 @@ class SearchTasksToolTest(unittest.TestCase):
         self.assertIn("Write report", result)
 
     def test_search_tasks_empty_keywords_and_tags(self) -> None:
-        """Test searching with empty keywords and tags - should return all tasks"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=[]))
+        """Test searching with no keywords and no tags"""
+        result = asyncio.run(server.search_tasks())
 
         self.assertIn("Found tasks:", result)
-        self.assertIn("Buy milk", result)
+        self.assertIn("Buy milk", result)  # should return all active tasks
         self.assertIn("Write report", result)
         self.assertIn("Meeting with team", result)
 
     def test_search_tasks_case_insensitive_tag_matching(self) -> None:
         """Test that tag matching is case insensitive"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=["RESPONSIBILITY"]))
+        result = asyncio.run(server.search_tasks(tags=["RESPONSIBILITY"]))
 
         self.assertIn("Found tasks:", result)
-        self.assertIn("Buy milk", result)
-        self.assertNotIn("Write report", result)
+        self.assertIn("Buy milk", result)  # has "responsibility" tag (lowercase)
+        self.assertNotIn("Write report", result)  # doesn't have "responsibility" tag
 
     def test_search_tasks_exact_tag_matching(self) -> None:
-        """Test that tag matching requires exact match (not partial)"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=["week"]))
+        """Test that exact tag matching works"""
+        result = asyncio.run(server.search_tasks(tags=["week1"]))
 
-        self.assertEqual(
-            "No tasks found matching the provided keywords.",
-            result,
-        )
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Buy milk", result)  # has "week1" tag
+        self.assertNotIn("Write report", result),
 
     def test_search_tasks_exact_tag_match_works(self) -> None:
         """Test that exact tag matching works"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=["week1"]))
+        result = asyncio.run(server.search_tasks(tags=["week1"]))
 
         self.assertIn("Found tasks:", result)
         self.assertIn("Buy milk", result)  # has "week1" tag
@@ -245,7 +244,7 @@ class SearchTasksToolTest(unittest.TestCase):
 
     def test_search_tasks_status_filter_active(self) -> None:
         """Test searching with status='active' filter"""
-        result = asyncio.run(server.search_tasks(keywords=[], status="active"))
+        result = asyncio.run(server.search_tasks(status="active"))
 
         self.assertIn("Found tasks:", result)
         self.assertIn("Buy milk", result)  # active task
@@ -254,7 +253,7 @@ class SearchTasksToolTest(unittest.TestCase):
 
     def test_search_tasks_status_filter_completed(self) -> None:
         """Test searching with status='completed' filter"""
-        result = asyncio.run(server.search_tasks(keywords=[], status="completed"))
+        result = asyncio.run(server.search_tasks(status="completed"))
 
         # Should return the completed task
         self.assertIn("Found tasks:", result)
@@ -264,7 +263,7 @@ class SearchTasksToolTest(unittest.TestCase):
 
     def test_search_tasks_status_filter_with_tags(self) -> None:
         """Test searching with both status and tags"""
-        result = asyncio.run(server.search_tasks(keywords=[], tags=["30Day"], status="active"))
+        result = asyncio.run(server.search_tasks(tags=["30Day"], status="active"))
 
         self.assertIn("Found tasks:", result)
         self.assertIn("Write report", result)  # has "30Day" tag and is active
@@ -272,7 +271,7 @@ class SearchTasksToolTest(unittest.TestCase):
 
     def test_search_tasks_default_status_active(self) -> None:
         """Test that default behavior returns only active tasks"""
-        result = asyncio.run(server.search_tasks(keywords=[]))
+        result = asyncio.run(server.search_tasks())
 
         self.assertIn("Found tasks:", result)
         self.assertIn("Buy milk", result)  # active task
@@ -290,7 +289,7 @@ class SearchTasksToolTest(unittest.TestCase):
         """Test searching with status='abandoned' filter"""
         # Update test data to use proper abandoned status
         server.ticktick.tasks_by_project["project-1"][4]["status"] = -1
-        result = asyncio.run(server.search_tasks(keywords=[], status="abandoned"))
+        result = asyncio.run(server.search_tasks(status="abandoned"))
 
         self.assertIn("Found tasks:", result)
         self.assertIn("Abandoned task", result)  # abandoned task

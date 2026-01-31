@@ -596,7 +596,7 @@ async def delete_project(project_id: str) -> str:
 
 @mcp.tool()
 async def search_tasks(
-    keywords: List[str],
+    keywords: Optional[List[str]] = None,
     project_id: Optional[str] = None,
     tags: Optional[List[str]] = None,
     status: Optional[str] = None,
@@ -604,7 +604,8 @@ async def search_tasks(
     """Search for tasks across all projects based on provided keywords.
 
     Args:
-        keywords: A list of keywords to search for in task titles or content.
+        keywords: Optional list of keywords to search for in task titles or content.
+            When not provided, matches all tasks based on other criteria.
         project_id: Optional project ID. When provided, only tasks from this project
             are considered.
         tags: Optional list of tag names; when provided, only tasks that contain at
@@ -641,19 +642,21 @@ async def search_tasks(
             
             all_tasks.extend(tasks)
 
-        # Filter tasks based on keywords and tags
+        # Filter tasks based on keywords
         filtered_tasks = []
         for task in all_tasks:
             title = task.get('title', '').lower()
             content = task.get('content', '').lower()
             
             # Check if keywords match (or if no keywords provided)
-            matches_keywords = not keywords or any(
-                keyword.lower() in title or keyword.lower() in content
-                for keyword in keywords
-            )
-            if not matches_keywords:
-                continue
+            if keywords:
+                matches_keywords = any(
+                    keyword.lower() in title or keyword.lower() in content
+                    for keyword in keywords
+                )
+                if not matches_keywords:
+                    continue
+            # If no keywords provided, match all tasks (will be filtered by tags/status)
 
             # Check if tags match (or if no tags provided)
             if tags:
