@@ -296,6 +296,40 @@ class SearchTasksToolTest(unittest.TestCase):
         self.assertNotIn("Buy milk", result)  # active task
         self.assertNotIn("Write report", result)  # active task
 
+    def test_search_tasks_status_array_active_completed(self) -> None:
+        """Test searching with multiple statuses: active and completed"""
+        result = asyncio.run(server.search_tasks(status=["active", "completed"]))
+
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Buy milk", result)  # active task
+        self.assertIn("Write report", result)  # active task
+        self.assertIn("Completed task", result)  # completed task
+        self.assertNotIn("Abandoned task", result)  # abandoned task
+
+    def test_search_tasks_status_array_all_statuses(self) -> None:
+        """Test searching with all statuses"""
+        # Update test data to use proper abandoned status
+        server.ticktick.tasks_by_project["project-1"][4]["status"] = -1
+        result = asyncio.run(server.search_tasks(status=["active", "completed", "abandoned"]))
+
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Buy milk", result)  # active task
+        self.assertIn("Write report", result)  # active task
+        self.assertIn("Completed task", result)  # completed task
+        self.assertIn("Abandoned task", result)  # abandoned task
+
+    def test_search_tasks_status_array_completed_abandoned(self) -> None:
+        """Test searching with completed and abandoned statuses"""
+        # Update test data to use proper abandoned status
+        server.ticktick.tasks_by_project["project-1"][4]["status"] = -1
+        result = asyncio.run(server.search_tasks(status=["completed", "abandoned"]))
+
+        self.assertIn("Found tasks:", result)
+        self.assertIn("Completed task", result)  # completed task
+        self.assertIn("Abandoned task", result)  # abandoned task
+        self.assertNotIn("Buy milk", result)  # active task
+        self.assertNotIn("Write report", result)  # active task
+
 
 if __name__ == "__main__":
     unittest.main()

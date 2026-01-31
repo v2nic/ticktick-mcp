@@ -4,7 +4,7 @@ import os
 import logging
 from datetime import datetime, timezone, timedelta
 from enum import IntEnum
-from typing import Dict, List, Any, Optional
+from typing import List, Optional, Union, Any
 
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
@@ -599,7 +599,7 @@ async def search_tasks(
     keywords: Optional[List[str]] = None,
     project_id: Optional[str] = None,
     tags: Optional[List[str]] = None,
-    status: Optional[str] = None,
+    status: Optional[Union[str, List[str]]] = None,
 ) -> str:
     """Search for tasks across all projects based on provided keywords.
 
@@ -610,8 +610,8 @@ async def search_tasks(
             are considered.
         tags: Optional list of tag names; when provided, only tasks that contain at
             least one of these tags are included.
-        status: Optional status filter ("active", "completed", or "abandoned"). When not specified,
-            only active tasks are returned.
+        status: Optional status filter. Can be a single status ("active", "completed", 
+            "abandoned") or a list of statuses. When not specified, only active tasks are returned.
     """
     if not ticktick:
         if not initialize_client():
@@ -667,11 +667,24 @@ async def search_tasks(
             # Check if status matches (default to active if not specified)
             if status:
                 task_status = task.get("status", 0)  # Default to 0 (active) if not specified
-                if status == "active" and task_status != TaskStatus.ACTIVE:
-                    continue
-                elif status == "completed" and task_status != TaskStatus.COMPLETED:
-                    continue
-                elif status == "abandoned" and task_status != TaskStatus.ABANDONED:
+                
+                # Convert status to list if it's a single string
+                status_list = [status] if isinstance(status, str) else status
+                
+                # Check if task status matches any of the requested statuses
+                status_matches = False
+                for s in status_list:
+                    if s == "active" and task_status == TaskStatus.ACTIVE:
+                        status_matches = True
+                        break
+                    elif s == "completed" and task_status == TaskStatus.COMPLETED:
+                        status_matches = True
+                        break
+                    elif s == "abandoned" and task_status == TaskStatus.ABANDONED:
+                        status_matches = True
+                        break
+                
+                if not status_matches:
                     continue
             else:
                 # Default behavior: only return active tasks
