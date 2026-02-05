@@ -34,17 +34,8 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ti
    # Install uv if you don't have it already
    curl -LsSf https://astral.sh/uv/install.sh | sh
 
-   # Create a virtual environment
-   uv venv
-
-   # Activate the virtual environment
-   # On macOS/Linux:
-   source .venv/bin/activate
-   # On Windows:
-   .venv\Scripts\activate
-
-   # Install the package
-   uv pip install -e .
+   # Install dependencies
+   uv sync
    ```
 
 3. **Authenticate with TickTick**:
@@ -184,11 +175,12 @@ Here are some example prompts to use with Claude after connecting the TickTick M
 ```text
 ticktick-mcp/
 ├── .env.template          # Template for environment variables
+├── .python-version        # Python version specification
 ├── README.md              # Project documentation
-├── requirements.txt       # Project dependencies
-├── setup.py               # Package setup file
+├── pyproject.toml         # Project configuration and dependencies
 ├── test_all.py            # Run all tests with single command
 ├── test_server.py         # Test script for server configuration
+├── uv.lock                # Locked dependency versions
 ├── test_integration.py    # Integration tests for CLI and server startup
 ├── test_search_tasks.py   # Unit tests for search functionality
 └── ticktick_mcp/          # Main package
